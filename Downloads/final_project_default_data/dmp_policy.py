@@ -18,16 +18,20 @@ class DMPPolicyWithPID:
         dt (float): control timestep.
         n_bfs (int): number of basis functions per DMP.
     """
-    def __init__(self, square_pos, demo_path='demonstration_data.npz', dt=0.01, n_bfs=50):
+    def __init__(self, square_pos, demo_path='demos.npz', dt=0.01, n_bfs=50):
         self.dt = dt
         self.segment_dmps = []
         self.segment_targets = []
         self.segment_grasps = []
 
-        demos = reconstruct_from_npz("demos.npz")
+        demos = reconstruct_from_npz(demo_path)
+        if demos is None:
+            raise ValueError(f"Failed to load demo data from {demo_path}")
+
+        print(f"Loaded {len(demos)} demonstrations.")
 
         for demo_id, demo in demos.items():
-            if 'obs_robot0_eef_pos' not in demo or 'actions' not in demo or 'obs_object' not in demo:
+            if not all(key in demo for key in ['obs_robot0_eef_pos', 'actions', 'obs_object']):
                 print(f"Skipping {demo_id}: missing required fields.")
                 continue
 
@@ -35,28 +39,36 @@ class DMPPolicyWithPID:
             ee_grasp = demo['actions'][:, -1:].astype(int)  # (T,1)
             segments = self.detect_grasp_segments(ee_grasp)
 
+            if not segments:
+                print(f"Skipping {demo_id}: no grasp-based segments found.")
+                continue
+
             demo_obj_pos = demo['obs_object'][0, :3]
             offset = ee_pos[segments[0][1] - 1] - demo_obj_pos
 
             for i, (start, end) in enumerate(segments):
-                segment_traj = ee_pos[start:end].T 
+                if end - start < 2:
+                    print(f"Skipping short segment in {demo_id}: [{start}, {end}]")
+                    continue
+
+                segment_traj = ee_pos[start:end].T
                 if i == 0:
                     segment_traj = segment_traj.copy()
                     segment_traj[:, -1] = square_pos + offset
-                    segment_traj[2, -1] += 0.019  
+                    # segment_traj[2, -1] += 0.019  # lift for clearance
 
                 dmp = DMP(n_dmps=3, n_bfs=n_bfs, dt=self.dt, y0=segment_traj[:, 0], goal=segment_traj[:, -1])
-                y_interp = dmp.imitate(segment_traj)
+                dmp.imitate(segment_traj)
                 self.segment_dmps.append(dmp)
                 self.segment_targets.append(dmp.rollout())
                 self.segment_grasps.append(int(np.round(ee_grasp[start][0])))
 
-        self.pids = [PID(kp=5.0, ki=0.0, kd=0.45, target=traj[0]) for traj in self.segment_targets]
-        self.current_segment = 0
-        self.current_step = 0
-
+        self.pids = [PID(kp=5.0, ki=0.0, kd=0.0, target=traj[0]) for traj in self.segment_targets]
         for pid in self.pids:
             pid.reset()
+
+        self.current_segment = 0
+        self.current_step = 0
 
     def detect_grasp_segments(self, grasp_flags: np.ndarray) -> list:
         """
@@ -71,8 +83,7 @@ class DMPPolicyWithPID:
         grasp_flags = grasp_flags.squeeze()
         change_indices = np.where(np.diff(grasp_flags) != 0)[0] + 1
         segment_boundaries = [0] + change_indices.tolist() + [len(grasp_flags)]
-        segments = [(segment_boundaries[i], segment_boundaries[i+1]) for i in range(len(segment_boundaries) - 1)]
-        return segments
+        return [(segment_boundaries[i], segment_boundaries[i + 1]) for i in range(len(segment_boundaries) - 1)]
 
     def get_action(self, robot_eef_pos: np.ndarray) -> np.ndarray:
         """
