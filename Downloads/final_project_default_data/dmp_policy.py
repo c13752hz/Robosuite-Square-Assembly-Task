@@ -44,7 +44,7 @@ class DMPPolicyWithPID:
                 continue
 
             demo_obj_pos = demo['obs_object'][0, :3]
-            offset = ee_pos[segments[0][1] - 1] - demo_obj_pos
+            offset = square_pos - demo_obj_pos
 
             for i, (start, end) in enumerate(segments):
                 if end - start < 2:
@@ -54,8 +54,14 @@ class DMPPolicyWithPID:
                 segment_traj = ee_pos[start:end].T
                 if i == 0:
                     segment_traj = segment_traj.copy()
-                    segment_traj[:, -1] = square_pos + offset
-                    # segment_traj[2, -1] += 0.019  # lift for clearance
+                    segment_traj += offset[:, None]
+                    segment_traj[0, :] -= 0.02 
+                    segment_traj[1, :] += 0.045 
+                    segment_traj[2, :] -= 0.008
+                elif i == 1:
+                    segment_traj = segment_traj.copy()
+                    segment_traj[2, :] += 0.03
+                    segment_traj[0, :] += 0.03
 
                 dmp = DMP(n_dmps=3, n_bfs=n_bfs, dt=self.dt, y0=segment_traj[:, 0], goal=segment_traj[:, -1])
                 dmp.imitate(segment_traj)
@@ -63,7 +69,7 @@ class DMPPolicyWithPID:
                 self.segment_targets.append(dmp.rollout())
                 self.segment_grasps.append(int(np.round(ee_grasp[start][0])))
 
-        self.pids = [PID(kp=5.0, ki=0.0, kd=0.0, target=traj[0]) for traj in self.segment_targets]
+        self.pids = [PID(kp=2.0, ki=0.0, kd=0.0, target=traj[0]) for traj in self.segment_targets]
         for pid in self.pids:
             pid.reset()
 
