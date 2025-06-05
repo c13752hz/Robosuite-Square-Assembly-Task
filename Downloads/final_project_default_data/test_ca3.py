@@ -29,22 +29,23 @@ env = suite.make(
     has_renderer=True,
     has_offscreen_renderer=False,
     use_camera_obs=False,
-    placement_initializer=placement_initializer,
+    # placement_initializer=placement_initializer,
     ignore_done=True  
 )
 
 success_rate = 0
-# reset the environment
-for _ in range(5):
+num_trials = 20
+
+for _ in range(num_trials):
     obs = env.reset()
-    policy = DMPPolicyWithPID(obs['SquareNut_pos']) 
+    policy = DMPPolicyWithPID(obs['SquareNut_pos'], obs['SquareNut_quat']) 
     for _ in range(2500):
-        action = policy.get_action(obs['robot0_eef_pos'])
-        obs, reward, done, info = env.step(action)  # take action in the environment
-        env.render()  # render on display
+        action = policy.get_action(obs['robot0_eef_pos'], obs['robot0_eef_quat'])
+        obs, reward, done, info = env.step(action)
+        env.render()
         if reward == 1.0:
             success_rate += 1
             break
 
-success_rate /= 5.0
+success_rate /= num_trials
 print('success rate:', success_rate)
