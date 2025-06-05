@@ -36,6 +36,17 @@ env = suite.make(
     ignore_done=True  
 )
 
+# piazza 
+# env = suite.make(
+#     env_name="NutAssemblySquare", 
+#     robots="Panda", 
+#     has_renderer=True,
+#     has_offscreen_renderer=False,
+#     use_camera_obs=False,
+#     ignore_done=True,
+#     camera_names=["agentview"],
+# )
+
 num_episodes = 100
 max_steps_per_episode = 2500
 success_rate = 0
