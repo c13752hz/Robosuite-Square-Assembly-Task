@@ -32,7 +32,7 @@ env = suite.make(
     has_renderer=True,
     has_offscreen_renderer=False,
     use_camera_obs=False,
-    placement_initializer=placement_initializer,
+    # placement_initializer=placement_initializer,
     ignore_done=True  
 )
 
@@ -54,12 +54,12 @@ steps_to_success = []
 # reset the environment
 for _ in range(num_episodes):
     obs = env.reset()
-    policy = DMPPolicyWithPID(obs['SquareNut_pos']) 
+    policy = DMPPolicyWithPID(obs['SquareNut_pos'], obs['SquareNut_quat']) 
     step_count = None
     for t in range(max_steps_per_episode):
-        action = policy.get_action(obs['robot0_eef_pos'])
+        action = policy.get_action(obs['robot0_eef_pos'], obs['robot0_eef_quat'])
         obs, reward, done, info = env.step(action)  # take action in the environment
-        # env.render()  # render on display
+        env.render()  # render on display
         if reward == 1.0:
             step_count = t + 1
             success_rate += 1
