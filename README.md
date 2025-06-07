@@ -35,7 +35,7 @@ By default, the test script runs **5 trials** and outputs the success rate.
 To change the number of trials, open `test.py` and modify the following line:
 
 ```python
-num_trials = 5  # Set this to your desired number of trials
+num_episodes = 100  # Set this to your desired number of trials
 ```
 
 ---
